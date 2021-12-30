@@ -29,24 +29,16 @@ var checkResultsCmd = &cobra.Command{
 	Short:   "Check each of the image pairs found in the \"find-duplicates\" command",
 	Long:    `Check each of the image pairs by opening both of them in the system default image application. The user will be prompted to confirm if the file is a duplicate or not. All confirmed duplicates can subsequently be deleted with the "delete" command.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		checkResults("dedupe_results.yaml")
+		checkResults("dedugo_results.yaml")
 	},
 }
 
 func init() {
 	rootCmd.AddCommand(checkResultsCmd)
-
-	// Here you will define your flags and configuration settings.
-
-	// Cobra supports Persistent Flags which will work for this command
-	// and all subcommands, e.g.:
-	// checkResultsCmd.PersistentFlags().String("foo", "", "A help for foo")
-
-	// Cobra supports local flags which will only run when this command
-	// is called directly, e.g.:
-	// checkResultsCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
 }
 
+// checkResults reads from the Results file and iterates over the Image Pairs,
+// asking the user to confirm if the image is a duplicate or not
 func checkResults(results_path string) {
 	var input string
 	results := readResultsFile(results_path)

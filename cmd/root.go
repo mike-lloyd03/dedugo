@@ -27,7 +27,7 @@ import (
 var rootCmd = &cobra.Command{
 	Use:   "dedugo",
 	Short: "A tool for finding duplicate images",
-	Long:  `Dedugo will help you find simliar images between two directories.`,
+	Long:  `Dedugo will help you find common images between two directories. Image formats can be .jpg, .png. or .heic.`,
 }
 
 // Execute adds all child commands to the root command and sets flags appropriately.

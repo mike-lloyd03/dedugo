@@ -11,3 +11,4 @@ test_go
 go.sum
 duplicateImages.txt
 dedupe_results.yaml
+dedugo

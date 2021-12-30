@@ -23,7 +23,7 @@ func writeResultsFile(results Results, path string) {
 		log.Fatal(err)
 	}
 
-	err = ioutil.WriteFile("dedupe_results.yaml", data, 0644)
+	err = ioutil.WriteFile(path, data, 0644)
 	if err != nil {
 		log.Fatal("Error writing results file.", err)
 	}
