@@ -1,0 +1,11 @@
+*.jpg
+*.jpeg
+*.JPG
+*.JPEG
+*.heic
+*.HEIC
+*.heif
+*.HEIF
+test_files
+test_go
+go.sum
