@@ -19,7 +19,6 @@ import (
 	"fmt"
 	"os/exec"
 
-	"github.com/mike-lloyd03/dedugo/gui"
 	"github.com/spf13/cobra"
 )
 
@@ -41,34 +40,34 @@ func init() {
 // checkResults reads from the Results file and iterates over the Image Pairs,
 // asking the user to confirm if the image is a duplicate or not
 func checkResults(results_path string) {
-	// var input string
+	var input string
 	results := readResultsFile(results_path)
 
-	// read_input:
+read_input:
 	for i := results.StartIdx; i < len(results.ImagePairs); i++ {
 		p := results.ImagePairs[i]
-		// openDuplicates(p.RefImage, p.DupeImage)
+		openDuplicates(p.RefImage, p.DupeImage)
 
 		results.StartIdx = i
 		writeResultsFile(results, results_path)
 
-		// fmt.Printf("%s and %s are duplicates? [y/N/stop] ", p.RefImage, p.DupeImage)
-		// fmt.Scanln(&input)
+		fmt.Printf("%s and %s are duplicates? [y/N/stop] ", p.RefImage, p.DupeImage)
+		fmt.Scanln(&input)
 
-		// switch input {
-		// case "y", "Y":
-		// 	results.ImagePairs[i].Confirmed = true
-		// 	writeResultsFile(results, results_path)
-		// case "stop":
-		// 	break read_input
-		// default:
-		// 	continue
-		// }
-		if gui.ShowGui(p.RefImage, p.DupeImage) {
-			fmt.Println("yes")
+		switch input {
+		case "y", "Y":
 			results.ImagePairs[i].Confirmed = true
 			writeResultsFile(results, results_path)
+		case "stop":
+			break read_input
+		default:
+			continue
 		}
+		// if gui.ShowGui(p.RefImage, p.DupeImage) {
+		// 	fmt.Println("yes")
+		// 	results.ImagePairs[i].Confirmed = true
+		// 	writeResultsFile(results, results_path)
+		// }
 	}
 }
 

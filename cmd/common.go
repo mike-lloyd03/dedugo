@@ -7,7 +7,7 @@ import (
 	"gopkg.in/yaml.v2"
 )
 
-func readResultsFile(path string) Results {
+func ReadResultsFile(path string) Results {
 	results := Results{}
 	file, err := ioutil.ReadFile(path)
 	if err != nil {
@@ -17,7 +17,7 @@ func readResultsFile(path string) Results {
 	return results
 }
 
-func writeResultsFile(results Results, path string) {
+func WriteResultsFile(results Results, path string) {
 	data, err := yaml.Marshal(results)
 	if err != nil {
 		log.Fatal(err)

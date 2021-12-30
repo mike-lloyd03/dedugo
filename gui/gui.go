@@ -7,6 +7,7 @@ import (
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/layout"
 	"fyne.io/fyne/v2/widget"
+	"github.com/mike-lloyd03/dedugo/cmd"
 )
 
 const (
@@ -19,29 +20,33 @@ var (
 	a           = app.New()
 )
 
-func ShowGui(refImagePath, dupeImagePath string) bool {
+func ShowGui(results_path string) bool {
+	results := cmd.ReadResultsFile(results_path)
 	w := a.NewWindow("dedugo")
 	w.CenterOnScreen()
 
-	refLabel := widget.NewLabel("Reference Image")
-	refImage := canvas.NewImageFromFile(refImagePath)
-	refImage.SetMinSize(fyne.NewSize(imgWidth, imgHeight))
-	refImage.FillMode = canvas.ImageFillContain
+	for i := results.StartIdx; i < len(results.ImagePairs); i++ {
+		p := results.ImagePairs[i]
+		refLabel := widget.NewLabel("Reference Image")
+		refImage := canvas.NewImageFromFile(p.RefImage)
+		refImage.SetMinSize(fyne.NewSize(imgWidth, imgHeight))
+		refImage.FillMode = canvas.ImageFillContain
 
-	dupeLabel := widget.NewLabel("Duplicate Image")
-	dupeImage := canvas.NewImageFromFile(dupeImagePath)
-	dupeImage.SetMinSize(fyne.NewSize(imgWidth, imgHeight))
-	dupeImage.FillMode = canvas.ImageFillContain
+		dupeLabel := widget.NewLabel("Duplicate Image")
+		dupeImage := canvas.NewImageFromFile(p.DupeImage)
+		dupeImage.SetMinSize(fyne.NewSize(imgWidth, imgHeight))
+		dupeImage.FillMode = canvas.ImageFillContain
 
-	yesButton := widget.NewButton("Yes", yesFunc)
-	noButton := widget.NewButton("No", noFunc)
+		yesButton := widget.NewButton("Yes", yesFunc)
+		noButton := widget.NewButton("No", noFunc)
 
-	refImgCont := container.NewVBox(refLabel, refImage)
-	dupeImgCont := container.NewVBox(dupeLabel, dupeImage)
-	imgCont := container.NewHBox(refImgCont, dupeImgCont)
-	buttonCont := container.NewHBox(layout.NewSpacer(), noButton, yesButton, layout.NewSpacer())
-	mainCont := container.NewVBox(imgCont, buttonCont)
-	w.SetContent(mainCont)
+		refImgCont := container.NewVBox(refLabel, refImage)
+		dupeImgCont := container.NewVBox(dupeLabel, dupeImage)
+		imgCont := container.NewHBox(refImgCont, dupeImgCont)
+		buttonCont := container.NewHBox(layout.NewSpacer(), noButton, yesButton, layout.NewSpacer())
+		mainCont := container.NewVBox(imgCont, buttonCont)
+		w.SetContent(mainCont)
+	}
 
 	w.ShowAndRun()
 	return isDuplicate
