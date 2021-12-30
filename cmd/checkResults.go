@@ -1,0 +1,80 @@
+/*
+Copyright © 2021 NAME HERE <EMAIL ADDRESS>
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+package cmd
+
+import (
+	"fmt"
+	"os/exec"
+
+	"github.com/spf13/cobra"
+)
+
+// checkResultsCmd represents the checkResults command
+var checkResultsCmd = &cobra.Command{
+	Aliases: []string{"check", "c"},
+	Use:     "check-results",
+	Short:   "Check each of the image pairs found in the \"find-duplicates\" command",
+	Long:    `Check each of the image pairs by opening both of them in the system default image application. The user will be prompted to confirm if the file is a duplicate or not. All confirmed duplicates can subsequently be deleted with the "delete" command.`,
+	Run: func(cmd *cobra.Command, args []string) {
+		checkResults("dedupe_results.yaml")
+	},
+}
+
+func init() {
+	rootCmd.AddCommand(checkResultsCmd)
+
+	// Here you will define your flags and configuration settings.
+
+	// Cobra supports Persistent Flags which will work for this command
+	// and all subcommands, e.g.:
+	// checkResultsCmd.PersistentFlags().String("foo", "", "A help for foo")
+
+	// Cobra supports local flags which will only run when this command
+	// is called directly, e.g.:
+	// checkResultsCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
+}
+
+func checkResults(results_path string) {
+	var input string
+	results := readResultsFile(results_path)
+
+read_input:
+	for i := results.StartIdx; i < len(results.ImagePairs); i++ {
+		p := results.ImagePairs[i]
+		openDuplicates(p.RefImage, p.DupeImage)
+
+		results.StartIdx = i
+		writeResultsFile(results, results_path)
+
+		fmt.Printf("%s and %s are duplicates? [y/N/stop] ", p.RefImage, p.DupeImage)
+		fmt.Scanln(&input)
+
+		switch input {
+		case "y", "Y":
+			results.ImagePairs[i].Confirmed = true
+			writeResultsFile(results, results_path)
+		case "stop":
+			break read_input
+		default:
+			continue
+		}
+	}
+}
+
+func openDuplicates(refFile string, dupeFile string) {
+	exec.Command("xdg-open", refFile).Start()
+	exec.Command("xdg-open", dupeFile).Run()
+}

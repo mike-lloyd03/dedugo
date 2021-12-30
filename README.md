@@ -16,6 +16,7 @@ dedugo ./reference/image/directory ./evaluation/image/directory
 Things will happen. Silicon will get hot. Fans will spin.
 
 ### To Do
-- [ ] Allow user to visually confirm if paired images are indeed duplicates or are actually just very similar
-- [ ] Convert this to use [Cobra](https://github.com/spf13/cobra)
+- [x] Allow user to visually confirm if paired images are indeed duplicates or are actually just very similar
+- [x] Convert this to use [Cobra](https://github.com/spf13/cobra)
 - [ ] A GUI would be neat
+- [ ] Add `delete` command to remove confirmed duplicates

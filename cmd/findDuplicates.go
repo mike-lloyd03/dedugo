@@ -20,7 +20,6 @@ import (
 	"fmt"
 	"image"
 	"io/fs"
-	"io/ioutil"
 	"log"
 	"os"
 	"path/filepath"
@@ -30,7 +29,6 @@ import (
 	_ "github.com/adrium/goheif"
 	"github.com/spf13/cobra"
 	"github.com/vitali-fedulov/images"
-	"gopkg.in/yaml.v2"
 )
 
 // findDuplicatesCmd represents the findDuplicates command
@@ -79,6 +77,7 @@ type Image struct {
 type Pair struct {
 	RefImage  string `yaml:"ReferenceImage"`
 	DupeImage string `yaml:"DuplicateImage"`
+	Confirmed bool   `yaml:"Confirmed?"`
 }
 
 type Results struct {
@@ -192,7 +191,7 @@ func CompareImages(refImg Image, evalImages []Image, pairMap map[string]Pair) {
 	for _, evalImg := range evalImages {
 		if images.Similar(refImg.Hash, evalImg.Hash, refImg.Size, evalImg.Size) {
 			m.Lock()
-			pairMap[refImg.Path+","+evalImg.Path] = Pair{refImg.Path, evalImg.Path}
+			pairMap[refImg.Path+","+evalImg.Path] = Pair{RefImage: refImg.Path, DupeImage: evalImg.Path}
 			m.Unlock()
 		}
 	}
@@ -200,10 +199,10 @@ func CompareImages(refImg Image, evalImages []Image, pairMap map[string]Pair) {
 
 func GenerateResults(refDir, evalDir string, pairMap map[string]Pair) {
 	pairArray := make([]Pair, len(pairMap))
-	index := 0
+	i := 0
 	for _, p := range pairMap {
-		pairArray[index] = p
-		index++
+		pairArray[i] = p
+		i++
 	}
 	results := Results{
 		RefDir:     refDir,
@@ -211,13 +210,5 @@ func GenerateResults(refDir, evalDir string, pairMap map[string]Pair) {
 		StartIdx:   0,
 		ImagePairs: pairArray,
 	}
-	data, err := yaml.Marshal(results)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	err = ioutil.WriteFile("dedupe_results.yaml", data, 0644)
-	if err != nil {
-		log.Fatal("Error writing results file", err)
-	}
+	writeResultsFile(results, "dedugo_results.yaml")
 }
