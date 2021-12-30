@@ -210,5 +210,5 @@ func GenerateResults(refDir, evalDir string, pairMap map[string]Pair) {
 		StartIdx:   0,
 		ImagePairs: pairArray,
 	}
-	writeResultsFile(results, "dedugo_results.yaml")
+	WriteResultsFile(results, "dedugo_results.yaml")
 }

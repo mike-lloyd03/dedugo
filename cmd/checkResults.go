@@ -22,6 +22,10 @@ import (
 	"github.com/spf13/cobra"
 )
 
+const (
+	results_path = "dedugo_results.yaml"
+)
+
 // checkResultsCmd represents the checkResults command
 var checkResultsCmd = &cobra.Command{
 	Aliases: []string{"check", "c"},
@@ -29,7 +33,8 @@ var checkResultsCmd = &cobra.Command{
 	Short:   "Check each of the image pairs found in the \"find-duplicates\" command",
 	Long:    `Check each of the image pairs by opening both of them in the system default image application. The user will be prompted to confirm if the file is a duplicate or not. All confirmed duplicates can subsequently be deleted with the "delete" command.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		checkResults("dedugo_results.yaml")
+		// checkResults("dedugo_results.yaml")
+		checkResultsGui()
 	},
 }
 
@@ -49,7 +54,7 @@ read_input:
 		openDuplicates(p.RefImage, p.DupeImage)
 
 		results.StartIdx = i
-		writeResultsFile(results, results_path)
+		WriteResultsFile(results, results_path)
 
 		fmt.Printf("%s and %s are duplicates? [y/N/stop] ", p.RefImage, p.DupeImage)
 		fmt.Scanln(&input)
@@ -57,7 +62,7 @@ read_input:
 		switch input {
 		case "y", "Y":
 			results.ImagePairs[i].Confirmed = true
-			writeResultsFile(results, results_path)
+			WriteResultsFile(results, results_path)
 		case "stop":
 			break read_input
 		default:
@@ -74,4 +79,8 @@ read_input:
 func openDuplicates(refFile string, dupeFile string) {
 	exec.Command("xdg-open", refFile).Start()
 	exec.Command("xdg-open", dupeFile).Run()
+}
+
+func checkResultsGui() {
+	showGui()
 }

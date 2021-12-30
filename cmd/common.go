@@ -7,7 +7,7 @@ import (
 	"gopkg.in/yaml.v2"
 )
 
-func ReadResultsFile(path string) Results {
+func readResultsFile(path string) Results {
 	results := Results{}
 	file, err := ioutil.ReadFile(path)
 	if err != nil {
