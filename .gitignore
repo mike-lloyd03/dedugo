@@ -10,3 +10,4 @@ test_files
 test_go
 go.sum
 duplicateImages.txt
+dedupe_results.yaml

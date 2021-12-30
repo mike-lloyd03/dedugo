@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"image"
 	"io/fs"
+	"io/ioutil"
 	"log"
 	"os"
 	"path/filepath"
@@ -29,6 +30,7 @@ import (
 	_ "github.com/adrium/goheif"
 	"github.com/spf13/cobra"
 	"github.com/vitali-fedulov/images"
+	"gopkg.in/yaml.v2"
 )
 
 // findDuplicatesCmd represents the findDuplicates command
@@ -64,9 +66,8 @@ var (
 		".heic": {},
 		".png":  {},
 	}
-	wg              sync.WaitGroup
-	duplicatesFound int = 0
-	m               sync.Mutex
+	wg sync.WaitGroup
+	m  sync.Mutex
 )
 
 type Image struct {
@@ -76,8 +77,15 @@ type Image struct {
 }
 
 type Pair struct {
-	RefImage  string
-	DupeImage string
+	RefImage  string `yaml:"ReferenceImage"`
+	DupeImage string `yaml:"DuplicateImage"`
+}
+
+type Results struct {
+	RefDir     string `yaml:"ReferenceDirectory"`
+	EvalDir    string `yaml:"EvaluationDirectory"`
+	StartIdx   int    `yaml:"StartIndex"`
+	ImagePairs []Pair `yaml:"ImagePairs"`
 }
 
 func findDuplicates(refDir, evalDir string) {
@@ -101,8 +109,9 @@ func findDuplicates(refDir, evalDir string) {
 		go CompareImages(refImg, evalImages, pairMap)
 	}
 	wg.Wait()
-	fmt.Printf("Done. %d potential duplicate images found.\n", duplicatesFound)
+	fmt.Printf("Done. %d potential duplicate images found.\n", len(pairMap))
 	// checkDuplicates(pairMap)
+	GenerateResults(refDir, evalDir, pairMap)
 }
 
 func countFiles(dir string) int {
@@ -183,9 +192,32 @@ func CompareImages(refImg Image, evalImages []Image, pairMap map[string]Pair) {
 	for _, evalImg := range evalImages {
 		if images.Similar(refImg.Hash, evalImg.Hash, refImg.Size, evalImg.Size) {
 			m.Lock()
-			duplicatesFound++
 			pairMap[refImg.Path+","+evalImg.Path] = Pair{refImg.Path, evalImg.Path}
 			m.Unlock()
 		}
+	}
+}
+
+func GenerateResults(refDir, evalDir string, pairMap map[string]Pair) {
+	pairArray := make([]Pair, len(pairMap))
+	index := 0
+	for _, p := range pairMap {
+		pairArray[index] = p
+		index++
+	}
+	results := Results{
+		RefDir:     refDir,
+		EvalDir:    evalDir,
+		StartIdx:   0,
+		ImagePairs: pairArray,
+	}
+	data, err := yaml.Marshal(results)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	err = ioutil.WriteFile("dedupe_results.yaml", data, 0644)
+	if err != nil {
+		log.Fatal("Error writing results file", err)
 	}
 }
