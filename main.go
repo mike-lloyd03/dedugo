@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bufio"
 	"bytes"
 	"fmt"
 	"image"
@@ -23,7 +22,9 @@ var (
 		".heic": {},
 		".png":  {},
 	}
-	wg sync.WaitGroup
+	wg              sync.WaitGroup
+	duplicatesFound int = 0
+	m               sync.Mutex
 )
 
 type Image struct {
@@ -32,9 +33,15 @@ type Image struct {
 	Size image.Point
 }
 
+type Pair struct {
+	RefImage  string
+	DupeImage string
+}
+
 func main() {
+	pairMap := make(map[string]Pair)
 	refDir := os.Args[1]
-	scanDir := os.Args[2]
+	evalDir := os.Args[2]
 
 	refImages, err := getImagesFromDir(refDir)
 	if err != nil {
@@ -42,25 +49,20 @@ func main() {
 	}
 	fmt.Printf("Images found in reference directory: %d images.\n", len(refImages))
 
-	scanImages, err := getImagesFromDir(scanDir)
+	evalImages, err := getImagesFromDir(evalDir)
 	if err != nil {
 		log.Fatal("Error:", err)
 	}
-	fmt.Printf("Images found in scan directory: %d images.\n", len(scanImages))
-
-	outputFile, err := os.Create("./duplicateImages.txt")
-	if err != nil {
-		log.Fatal(err)
-	}
-	writer := bufio.NewWriter(outputFile)
+	fmt.Printf("Images found in evaluation directory: %d images.\n", len(evalImages))
 
 	fmt.Println("Comparing images...")
 	for _, refImg := range refImages {
 		wg.Add(1)
-		go CompareImages(refImg, scanImages, writer)
+		go CompareImages(refImg, evalImages, pairMap)
 	}
 	wg.Wait()
-	writer.Flush()
+	fmt.Printf("Done. %d potential duplicate images found.\n", duplicatesFound)
+	checkDuplicates(pairMap)
 }
 
 func countFiles(dir string) int {
@@ -136,15 +138,14 @@ func OpenImage(path string) (img image.Image, err error) {
 	return img, err
 }
 
-func CompareImages(refImg Image, scanImages []Image, outputWriter *bufio.Writer) {
+func CompareImages(refImg Image, evalImages []Image, pairMap map[string]Pair) {
 	defer wg.Done()
-	for _, scanImg := range scanImages {
-		if images.Similar(refImg.Hash, scanImg.Hash, refImg.Size, scanImg.Size) {
-			// fmt.Printf("%s and %s are similar.\n", refImg.Path, scanImg.Path)
-			_, err := outputWriter.WriteString(scanImg.Path + "\n")
-			if err != nil {
-				log.Fatal(err)
-			}
+	for _, evalImg := range evalImages {
+		if images.Similar(refImg.Hash, evalImg.Hash, refImg.Size, evalImg.Size) {
+			m.Lock()
+			duplicatesFound++
+			pairMap[refImg.Path+","+evalImg.Path] = Pair{refImg.Path, evalImg.Path}
+			m.Unlock()
 		}
 	}
 }
