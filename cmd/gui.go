@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"errors"
 	"image"
 	"log"
 	"os"
@@ -162,21 +163,25 @@ func loadImage(direction Direction) (image.Image, image.Image) {
 		i = results.StartIdx
 	}
 
-	refImageReader, err := os.Open(results.ImagePairs[i].RefImage)
+	refImageImage, err := openAndDecodeImage(results.ImagePairs[i].RefImage)
 	if err != nil {
-		log.Fatal("Referance image could not be opened.", err)
+		log.Fatal("Reference", err)
 	}
-	refImageImage, _, err := image.Decode(refImageReader)
+	dupeImageImage, err := openAndDecodeImage(results.ImagePairs[i].DupeImage)
 	if err != nil {
-		log.Fatal("Referance image could not be decoded.", err)
-	}
-	dupeImageReader, err := os.Open(results.ImagePairs[i].DupeImage)
-	if err != nil {
-		log.Fatal("Duplicate image could not be opened.", err)
-	}
-	dupeImageImage, _, err := image.Decode(dupeImageReader)
-	if err != nil {
-		log.Fatal("Duplicate image could not be decoded.", err)
+		log.Fatal("Duplicate", err)
 	}
 	return refImageImage, dupeImageImage
+}
+
+func openAndDecodeImage(path string) (image.Image, error) {
+	imageReader, err := os.Open(path)
+	if err != nil {
+		return nil, errors.New("Image could not be opened.")
+	}
+	image, _, err := image.Decode(imageReader)
+	if err != nil {
+		return nil, errors.New("Image could not be decoded.")
+	}
+	return image, nil
 }
