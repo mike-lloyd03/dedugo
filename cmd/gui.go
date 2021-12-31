@@ -1,6 +1,10 @@
 package cmd
 
 import (
+	"image"
+	"log"
+	"os"
+
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/app"
 	"fyne.io/fyne/v2/canvas"
@@ -9,20 +13,38 @@ import (
 	"fyne.io/fyne/v2/widget"
 )
 
+type ImageReader struct {
+	Path   string
+	Reader image.Image
+}
+
 const (
-	imgWidth  = 640
-	imgHeight = 480
+	imgWidth            = 640
+	imgHeight           = 480
+	Previous  Direction = iota
+	Current
+	Next
 )
 
 var (
-	textCentered = fyne.TextAlignCenter
-	monospaced   = fyne.TextStyle{Monospace: true}
-	bold         = fyne.TextStyle{Bold: true}
-	a            = app.New()
-	refImage     *canvas.Image
-	dupeImage    *canvas.Image
-	results      Results
+	textCentered  = fyne.TextAlignCenter
+	monospaced    = fyne.TextStyle{Monospace: true}
+	bold          = fyne.TextStyle{Bold: true}
+	a             = app.New()
+	results       Results
+	refImage      *canvas.Image
+	dupeImage     *canvas.Image
+	refImagePath  *widget.Label
+	dupeImagePath *widget.Label
+	prevRefImage  image.Image
+	currRefImage  image.Image
+	nextRefImage  image.Image
+	prevDupeImage image.Image
+	currDupeImage image.Image
+	nextDupeImage image.Image
 )
+
+type Direction int
 
 func showGui() {
 	results = readResultsFile(results_path)
@@ -31,15 +53,17 @@ func showGui() {
 	w := a.NewWindow("dedugo")
 	w.CenterOnScreen()
 
+	initImages()
+
 	refLabel := widget.NewLabelWithStyle("Reference Image", textCentered, bold)
-	refImagePath := widget.NewLabelWithStyle(p.RefImage, textCentered, monospaced)
-	refImage = canvas.NewImageFromFile(p.RefImage)
+	refImagePath = widget.NewLabelWithStyle(p.RefImage, textCentered, monospaced)
+	refImage = canvas.NewImageFromImage(currRefImage)
 	refImage.SetMinSize(fyne.NewSize(imgWidth, imgHeight))
 	refImage.FillMode = canvas.ImageFillContain
 
 	dupeLabel := widget.NewLabelWithStyle("Duplicate Image", textCentered, bold)
-	dupeImagePath := widget.NewLabelWithStyle(p.DupeImage, textCentered, monospaced)
-	dupeImage = canvas.NewImageFromFile(p.DupeImage)
+	dupeImagePath = widget.NewLabelWithStyle(p.DupeImage, textCentered, monospaced)
+	dupeImage = canvas.NewImageFromImage(currDupeImage)
 	dupeImage.SetMinSize(fyne.NewSize(imgWidth, imgHeight))
 	dupeImage.FillMode = canvas.ImageFillContain
 
@@ -63,35 +87,96 @@ func confirmDuplicate() func() {
 	return func() {
 		p := results.ImagePairs[results.StartIdx]
 		p.Confirmed = true
-		results.StartIdx++
-		WriteResultsFile(results, results_path)
-
-		refreshImages(results)
+		nextPair()
 	}
 }
 
 func nextPair() func() {
 	return func() {
 		results.StartIdx++
-		WriteResultsFile(results, results_path)
+		go WriteResultsFile(results, results_path)
 
-		refreshImages(results)
+		refreshImages(Next)
 	}
 }
 
 func prevPair() func() {
 	return func() {
 		results.StartIdx--
-		WriteResultsFile(results, results_path)
+		go WriteResultsFile(results, results_path)
 
-		refreshImages(results)
+		refreshImages(Previous)
 	}
 }
 
-func refreshImages(results Results) {
-	p := results.ImagePairs[results.StartIdx]
-	refImage.File = p.RefImage
-	dupeImage.File = p.DupeImage
-	refImage.Refresh()
-	dupeImage.Refresh()
+func refreshImages(direction Direction) {
+	if direction == Next {
+		prevRefImage = currRefImage
+		prevDupeImage = currDupeImage
+		currRefImage = nextRefImage
+		currDupeImage = nextDupeImage
+		nextRefImage, nextDupeImage = loadImage(Next)
+	} else if direction == Previous {
+		nextRefImage = currRefImage
+		nextDupeImage = currDupeImage
+		currRefImage = prevRefImage
+		currDupeImage = prevDupeImage
+		prevRefImage, prevDupeImage = loadImage(Previous)
+	}
+	refImage.Image = currRefImage
+	refImagePath.Text = results.ImagePairs[results.StartIdx].RefImage
+	dupeImage.Image = currDupeImage
+	dupeImagePath.Text = results.ImagePairs[results.StartIdx].DupeImage
+	go refImage.Refresh()
+	go refImagePath.Refresh()
+	go dupeImage.Refresh()
+	go dupeImagePath.Refresh()
+}
+
+func initImages() {
+	i := results.StartIdx
+	if i == 0 {
+		prevRefImage, prevDupeImage = nil, nil
+		currRefImage, currDupeImage = loadImage(Current)
+		nextRefImage, nextDupeImage = loadImage(Next)
+	} else if i == len(results.ImagePairs) {
+		prevRefImage, prevDupeImage = loadImage(Previous)
+		currRefImage, currDupeImage = loadImage(Current)
+		nextRefImage, nextDupeImage = nil, nil
+	} else {
+		prevRefImage, prevDupeImage = loadImage(Previous)
+		currRefImage, currDupeImage = loadImage(Current)
+		nextRefImage, nextDupeImage = loadImage(Next)
+	}
+}
+
+func loadImage(direction Direction) (image.Image, image.Image) {
+	var i int
+
+	switch direction {
+	case Next:
+		i = results.StartIdx + 1
+	case Previous:
+		i = results.StartIdx - 1
+	default:
+		i = results.StartIdx
+	}
+
+	refImageReader, err := os.Open(results.ImagePairs[i].RefImage)
+	if err != nil {
+		log.Fatal("Referance image could not be opened.", err)
+	}
+	refImageImage, _, err := image.Decode(refImageReader)
+	if err != nil {
+		log.Fatal("Referance image could not be decoded.", err)
+	}
+	dupeImageReader, err := os.Open(results.ImagePairs[i].DupeImage)
+	if err != nil {
+		log.Fatal("Duplicate image could not be opened.", err)
+	}
+	dupeImageImage, _, err := image.Decode(dupeImageReader)
+	if err != nil {
+		log.Fatal("Duplicate image could not be decoded.", err)
+	}
+	return refImageImage, dupeImageImage
 }
