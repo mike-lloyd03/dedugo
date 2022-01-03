@@ -31,13 +31,17 @@ import (
 	"github.com/vitali-fedulov/images"
 )
 
+var (
+	results_path string
+)
+
 // findDuplicatesCmd represents the findDuplicates command
 var findDuplicatesCmd = &cobra.Command{
 	Aliases: []string{"find", "f"},
 	Args:    cobra.MinimumNArgs(2),
 	Use:     "find-duplicates ref_directory eval_directory",
 	Short:   "Finds duplicate images between two directories.",
-	Long:    `Recursively searches through both input directories for images and compares if the "evaulation directory" contains any duplicates of images found in the "reference directory."`,
+	Long:    `Recursively searches through both input directories for images and compares if the "evaulation directory" contains any duplicates of images found in the "reference directory".`,
 	Run: func(cmd *cobra.Command, args []string) {
 		findDuplicates(args[0], args[1])
 	},
@@ -46,15 +50,7 @@ var findDuplicatesCmd = &cobra.Command{
 func init() {
 	rootCmd.AddCommand(findDuplicatesCmd)
 
-	// Here you will define your flags and configuration settings.
-
-	// Cobra supports Persistent Flags which will work for this command
-	// and all subcommands, e.g.:
-	// findDuplicatesCmd.PersistentFlags().String("foo", "", "A help for foo")
-
-	// Cobra supports local flags which will only run when this command
-	// is called directly, e.g.:
-	// findDuplicatesCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
+	findDuplicatesCmd.Flags().StringVarP(&results_path, "output", "o", "dedugo_results.yaml", "output file for results")
 }
 
 var (
@@ -210,5 +206,5 @@ func GenerateResults(refDir, evalDir string, pairMap map[string]Pair) {
 		StartIdx:   0,
 		ImagePairs: pairArray,
 	}
-	WriteResultsFile(results, "dedugo_results.yaml")
+	WriteResultsFile(results, results_path)
 }

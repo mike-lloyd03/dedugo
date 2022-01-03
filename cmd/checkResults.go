@@ -22,10 +22,6 @@ import (
 	"github.com/spf13/cobra"
 )
 
-const (
-	results_path = "dedugo_results.yaml"
-)
-
 // checkResultsCmd represents the checkResults command
 var checkResultsCmd = &cobra.Command{
 	Aliases: []string{"check", "c"},
@@ -33,13 +29,14 @@ var checkResultsCmd = &cobra.Command{
 	Short:   "Check each of the image pairs found in the \"find-duplicates\" command",
 	Long:    `Check each of the image pairs by opening both of them in the system default image application. The user will be prompted to confirm if the file is a duplicate or not. All confirmed duplicates can subsequently be deleted with the "delete" command.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		// checkResults("dedugo_results.yaml")
 		checkResultsGui()
 	},
 }
 
 func init() {
 	rootCmd.AddCommand(checkResultsCmd)
+
+	checkResultsCmd.Flags().StringVarP(&results_path, "input", "i", "dedugo_results.yaml", "input file to read results from")
 }
 
 // checkResults reads from the Results file and iterates over the Image Pairs,

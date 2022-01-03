@@ -19,6 +19,8 @@ type ImageReader struct {
 	Reader image.Image
 }
 
+type Direction int
+
 const (
 	imgWidth            = 640
 	imgHeight           = 480
@@ -44,8 +46,6 @@ var (
 	currDupeImage image.Image
 	nextDupeImage image.Image
 )
-
-type Direction int
 
 func showGui() {
 	results = readResultsFile(results_path)

@@ -35,7 +35,7 @@ dedugo delete-duplicates
 - [x] A GUI would be neat
 - [x] Add `delete` command to remove confirmed duplicates
 - [ ] Make image loading faster
-- [ ] Allow user to specify output filename for `find-duplicates` and input filename for `check-results`
+- [x] Allow user to specify output filename for `find-duplicates` and input filename for `check-results`
 - [ ] I probably need to incorporate the idea of similar image clusters rather than just image pairs.
 - [ ] Write tests...
 
