@@ -1,10 +1,11 @@
 package cmd
 
 import (
+	"bytes"
 	"errors"
 	"image"
+	"io/ioutil"
 	"log"
-	"os"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/app"
@@ -39,6 +40,8 @@ var (
 	dupeImage     *canvas.Image
 	refImagePath  *widget.Label
 	dupeImagePath *widget.Label
+	nextButton    *widget.Button
+	prevButton    *widget.Button
 	prevRefImage  image.Image
 	currRefImage  image.Image
 	nextRefImage  image.Image
@@ -73,8 +76,8 @@ func showGui() {
 	imgCont := container.NewHBox(refImgCont, dupeImgCont)
 
 	confirmButton := widget.NewButton("Confirm Duplicate", confirmDuplicate())
-	nextButton := widget.NewButton("Next", nextPair())
-	prevButton := widget.NewButton("Previous", prevPair())
+	nextButton = widget.NewButton("Next", nextPair())
+	prevButton = widget.NewButton("Previous", prevPair())
 
 	buttonCont := container.NewHBox(layout.NewSpacer(), prevButton, nextButton, confirmButton, layout.NewSpacer())
 	mainCont := container.NewVBox(imgCont, buttonCont)
@@ -94,10 +97,13 @@ func confirmDuplicate() func() {
 
 func nextPair() func() {
 	return func() {
-		results.StartIdx++
-		go WriteResultsFile(results, results_path)
-
-		refreshImages(Next)
+		if results.StartIdx <= len(results.ImagePairs) {
+			results.StartIdx++
+			go WriteResultsFile(results, results_path)
+			refreshImages(Next)
+		} else {
+			nextButton.Disable()
+		}
 	}
 }
 
@@ -175,10 +181,11 @@ func loadImage(direction Direction) (image.Image, image.Image) {
 }
 
 func openAndDecodeImage(path string) (image.Image, error) {
-	imageReader, err := os.Open(path)
+	imageBytes, err := ioutil.ReadFile(path)
 	if err != nil {
 		return nil, errors.New("Image could not be opened.")
 	}
+	imageReader := bytes.NewReader(imageBytes)
 	image, _, err := image.Decode(imageReader)
 	if err != nil {
 		return nil, errors.New("Image could not be decoded.")

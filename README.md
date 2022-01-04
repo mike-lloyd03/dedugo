@@ -38,6 +38,7 @@ dedugo delete-duplicates
 - [x] Allow user to specify output filename for `find-duplicates` and input filename for `check-results`
 - [ ] I probably need to incorporate the idea of similar image clusters rather than just image pairs.
 - [ ] Write tests...
+- [ ] GUI should show if an image has already been confirmed and allow user to unmark it.
 
 ### Thanks
 A special thanks to [Vitali Fedulov](https://github.com/vitali-fedulov) for writing the [Go package](https://github.com/vitali-fedulov/images) upon which this tool is built.
