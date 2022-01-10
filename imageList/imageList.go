@@ -6,6 +6,12 @@ import (
 	"fmt"
 	"image"
 	"io/ioutil"
+	"sync"
+)
+
+var (
+	m sync.Mutex
+	w sync.WaitGroup
 )
 
 type ImageList struct {
@@ -37,6 +43,7 @@ func New(paths []string) (ImageList, error) {
 
 func (il *ImageList) Next() (image.Image, error) {
 	// TODO: If list is less than three images
+	w.Wait()
 	if il.index < 2 {
 		nextImage := il.imageCache[il.index]
 		il.index++
@@ -44,6 +51,7 @@ func (il *ImageList) Next() (image.Image, error) {
 	} else if 2 <= il.index && il.index < len(il.paths)-1 {
 		nextImage := il.imageCache[2]
 		il.index++
+		w.Add(1)
 		go il.appendImage()
 		return nextImage, nil
 	} else if il.index == len(il.paths)-1 {
@@ -54,14 +62,21 @@ func (il *ImageList) Next() (image.Image, error) {
 }
 
 func (il *ImageList) Previous() (image.Image, error) {
+	// TODO: If list is less than three images
+	w.Wait()
 	if il.index == len(il.paths)-1 {
 		prevImage := il.imageCache[1]
 		il.index--
 		return prevImage, nil
-	} else if 0 < il.index && il.index < len(il.paths)-1 {
+	} else if 1 < il.index && il.index < len(il.paths)-1 {
 		prevImage := il.imageCache[0]
 		il.index--
+		w.Add(1)
 		go il.prependImage()
+		return prevImage, nil
+	} else if il.index == 1 {
+		prevImage := il.imageCache[0]
+		il.index--
 		return prevImage, nil
 	} else if il.index == 0 {
 		prevImage := il.imageCache[0]
@@ -84,13 +99,17 @@ func loadImage(path string) (image.Image, error) {
 }
 
 func (il *ImageList) appendImage() {
-	fmt.Println("appending", il.paths[il.index])
+	defer w.Done()
 	aImg, _ := loadImage(il.paths[il.index])
-	il.imageCache = append(il.imageCache[1:3], aImg)
+	m.Lock()
+	il.imageCache = append(il.imageCache[1:], aImg)
+	m.Unlock()
 }
 
 func (il *ImageList) prependImage() {
-	fmt.Println("prepending", il.paths[il.index-1])
+	defer w.Done()
 	pImg, _ := loadImage(il.paths[il.index-1])
-	il.imageCache = append([]image.Image{pImg}, il.imageCache[:1]...)
+	m.Lock()
+	il.imageCache = append([]image.Image{pImg}, il.imageCache[:2]...)
+	m.Unlock()
 }

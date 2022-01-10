@@ -13,7 +13,7 @@ func TestNewImageList(t *testing.T) {
 	paths := []string{
 		"./test_images/Obi1.jpg",
 		"./test_images/Obi2.jpg",
-		"./test_images/Jango1.jpg",
+		"./test_images/Jango3.jpg",
 	}
 
 	imgList := make([]image.Image, 3)
@@ -66,9 +66,9 @@ func TestNextandPrevious(t *testing.T) {
 	paths := []string{
 		"./test_images/Obi1.jpg",
 		"./test_images/Obi2.jpg",
-		"./test_images/Jango1.jpg",
-		"./test_images/Jango2.jpg",
-		"./test_images/Kylo1.jpg",
+		"./test_images/Jango3.jpg",
+		"./test_images/Jango4.jpg",
+		"./test_images/Kylo5.jpg",
 	}
 	expectImages := make([]image.Image, len(paths))
 	for i, p := range paths {
@@ -222,7 +222,7 @@ func TestNextandPrevious(t *testing.T) {
 	}
 	// prevImage should be the first image in the list
 	if !compareImages(prevImage, expectImages[0]) {
-		t.Error("got wrong previous (first) image. got", findImage(prevImage, expectImages))
+		t.Error("got wrong previous (first) image")
 	}
 	// Getting previous image before zero should return the first image
 	prevImage, err = il.Previous()
@@ -232,6 +232,15 @@ func TestNextandPrevious(t *testing.T) {
 	// prevImage should be the first image in the list
 	if !compareImages(prevImage, expectImages[0]) {
 		t.Error("got wrong previous (first) image after index is zero")
+	}
+
+	// First image in image cache should be first image in list
+	if !compareImages(il.imageCache[0], expectImages[0]) {
+		t.Error("first image in image cache should be first image in path list")
+	}
+	// Last image in image cache should be third image in list
+	if !compareImages(il.imageCache[2], expectImages[2]) {
+		t.Error("last image in image cache should be third image in path list")
 	}
 
 	// Index should not be less than zero
@@ -253,13 +262,4 @@ func compareImages(img1, img2 image.Image) bool {
 		}
 	}
 	return true
-}
-
-func findImage(img image.Image, imgList []image.Image) int {
-	for i, compImage := range imgList {
-		if compareImages(img, compImage) {
-			return i
-		}
-	}
-	return 100
 }
