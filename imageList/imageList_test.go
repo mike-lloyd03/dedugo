@@ -59,6 +59,18 @@ func TestNewImageList(t *testing.T) {
 			t.Error("image cache was not instantiated correctly")
 		}
 	}
+
+	// Load image list with less than 3 items
+	_, err = New(paths[:2])
+	if err == nil {
+		t.Error("creating an ImageList with less than 3 items should return an error")
+	}
+	// Load image list with un-loadable image
+	badPaths := append(paths[:2], "notANimagePath.jpg")
+	_, err = New(badPaths)
+	if err == nil {
+		t.Error("creating an ImageList with unopenable images should return an error")
+	}
 }
 
 func TestNextandPrevious(t *testing.T) {
@@ -246,6 +258,18 @@ func TestNextandPrevious(t *testing.T) {
 	// Index should not be less than zero
 	if il.index != 0 {
 		t.Error("index should be zero")
+	}
+}
+
+func TestLoadImage(t *testing.T) {
+	// Load non-existant file
+	_, err := loadImage("notAfile.jpg")
+	if err == nil {
+		t.Error("loading a non-existant file should return an error")
+	}
+	_, err = loadImage("./test_images/notAnImage.jpg")
+	if err == nil {
+		t.Error("loading a file that is not an image should return an error")
 	}
 }
 

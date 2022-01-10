@@ -21,7 +21,7 @@ type ImageList struct {
 }
 
 func New(paths []string) (ImageList, error) {
-	if len(paths) < 2 {
+	if len(paths) < 3 {
 		return ImageList{}, errors.New("paths argument must contain at least 2 items")
 	}
 
