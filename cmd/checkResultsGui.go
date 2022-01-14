@@ -1,10 +1,7 @@
 package cmd
 
 import (
-	"bytes"
-	"errors"
 	"image"
-	"io/ioutil"
 	"log"
 
 	"fyne.io/fyne/v2"
@@ -13,6 +10,7 @@ import (
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/layout"
 	"fyne.io/fyne/v2/widget"
+	imagelist "github.com/mike-lloyd03/dedugo/imageList"
 )
 
 type ImageReader struct {
@@ -42,32 +40,49 @@ var (
 	dupeImagePath *widget.Label
 	nextButton    *widget.Button
 	prevButton    *widget.Button
-	prevRefImage  image.Image
-	currRefImage  image.Image
-	nextRefImage  image.Image
-	prevDupeImage image.Image
-	currDupeImage image.Image
-	nextDupeImage image.Image
+	refIL         imagelist.ImageList
+	dupeIL        imagelist.ImageList
 )
 
 func showGui() {
 	results = readResultsFile(results_path)
-	p := results.ImagePairs[results.StartIdx]
 
 	w := a.NewWindow("dedugo")
 	w.CenterOnScreen()
 
-	initImages()
+	var refImages, dupeImages []string
+	for _, p := range results.ImagePairs {
+		refImages = append(refImages, p.RefImage)
+		dupeImages = append(dupeImages, p.DupeImage)
+	}
+
+	var err error
+	refIL, err = imagelist.New(refImages)
+	if err != nil {
+		log.Fatal("error creating reference image list.", err)
+	}
+	dupeIL, err = imagelist.New(dupeImages)
+	if err != nil {
+		log.Fatal("error creating duplicate image list.", err)
+	}
+	refImgFile, refPath, err := refIL.Next()
+	if err != nil {
+		log.Fatal("failed to get initial referance image.", err)
+	}
+	dupeImgFile, dupePath, err := dupeIL.Next()
+	if err != nil {
+		log.Fatal("failed to get initial duplicate image.", err)
+	}
 
 	refLabel := widget.NewLabelWithStyle("Reference Image", textCentered, bold)
-	refImagePath = widget.NewLabelWithStyle(p.RefImage, textCentered, monospaced)
-	refImage = canvas.NewImageFromImage(currRefImage)
+	refImagePath = widget.NewLabelWithStyle(refPath, textCentered, monospaced)
+	refImage = canvas.NewImageFromImage(refImgFile)
 	refImage.SetMinSize(fyne.NewSize(imgWidth, imgHeight))
 	refImage.FillMode = canvas.ImageFillContain
 
 	dupeLabel := widget.NewLabelWithStyle("Duplicate Image", textCentered, bold)
-	dupeImagePath = widget.NewLabelWithStyle(p.DupeImage, textCentered, monospaced)
-	dupeImage = canvas.NewImageFromImage(currDupeImage)
+	dupeImagePath = widget.NewLabelWithStyle(dupePath, textCentered, monospaced)
+	dupeImage = canvas.NewImageFromImage(dupeImgFile)
 	dupeImage.SetMinSize(fyne.NewSize(imgWidth, imgHeight))
 	dupeImage.FillMode = canvas.ImageFillContain
 
@@ -117,78 +132,37 @@ func prevPair() func() {
 }
 
 func refreshImages(direction Direction) {
+	var refImageFile image.Image
+	var refPath string
+	var dupeImageFile image.Image
+	var dupePath string
+	var err error
+
 	if direction == Next {
-		prevRefImage = currRefImage
-		prevDupeImage = currDupeImage
-		currRefImage = nextRefImage
-		currDupeImage = nextDupeImage
-		nextRefImage, nextDupeImage = loadImage(Next)
+		refImageFile, refPath, err = refIL.Next()
+		if err != nil {
+			log.Fatal("failed to get next referance image.", err)
+		}
+		dupeImageFile, dupePath, err = dupeIL.Next()
+		if err != nil {
+			log.Fatal("failed to get next duplicate image.", err)
+		}
 	} else if direction == Previous {
-		nextRefImage = currRefImage
-		nextDupeImage = currDupeImage
-		currRefImage = prevRefImage
-		currDupeImage = prevDupeImage
-		prevRefImage, prevDupeImage = loadImage(Previous)
+		refImageFile, refPath, err = refIL.Previous()
+		if err != nil {
+			log.Fatal("failed to get previous referance image.", err)
+		}
+		dupeImageFile, dupePath, err = dupeIL.Previous()
+		if err != nil {
+			log.Fatal("failed to get previous duplicate image.", err)
+		}
 	}
-	refImage.Image = currRefImage
-	refImagePath.Text = results.ImagePairs[results.StartIdx].RefImage
-	dupeImage.Image = currDupeImage
-	dupeImagePath.Text = results.ImagePairs[results.StartIdx].DupeImage
-	go refImage.Refresh()
-	go refImagePath.Refresh()
-	go dupeImage.Refresh()
-	go dupeImagePath.Refresh()
-}
-
-func initImages() {
-	i := results.StartIdx
-	if i == 0 {
-		prevRefImage, prevDupeImage = nil, nil
-		currRefImage, currDupeImage = loadImage(Current)
-		nextRefImage, nextDupeImage = loadImage(Next)
-	} else if i == len(results.ImagePairs) {
-		prevRefImage, prevDupeImage = loadImage(Previous)
-		currRefImage, currDupeImage = loadImage(Current)
-		nextRefImage, nextDupeImage = nil, nil
-	} else {
-		prevRefImage, prevDupeImage = loadImage(Previous)
-		currRefImage, currDupeImage = loadImage(Current)
-		nextRefImage, nextDupeImage = loadImage(Next)
-	}
-}
-
-func loadImage(direction Direction) (image.Image, image.Image) {
-	var i int
-
-	switch direction {
-	case Next:
-		i = results.StartIdx + 1
-	case Previous:
-		i = results.StartIdx - 1
-	default:
-		i = results.StartIdx
-	}
-
-	refImageImage, err := openAndDecodeImage(results.ImagePairs[i].RefImage)
-	if err != nil {
-		log.Fatal("Reference", err)
-	}
-	dupeImageImage, err := openAndDecodeImage(results.ImagePairs[i].DupeImage)
-	if err != nil {
-		log.Fatal("Duplicate", err)
-	}
-	return refImageImage, dupeImageImage
-}
-
-func openAndDecodeImage(path string) (image.Image, error) {
-	imageBytes, err := ioutil.ReadFile(path)
-	if err != nil {
-		return nil, errors.New("Image could not be opened.")
-	}
-	imageReader := bytes.NewReader(imageBytes)
-	image, _, err := image.Decode(imageReader)
-	if err != nil {
-		return nil, errors.New("Image could not be decoded.")
-	}
-	return image, nil
+	refImage.Image = refImageFile
+	refImagePath.Text = refPath
+	dupeImage.Image = dupeImageFile
+	dupeImagePath.Text = dupePath
+	refImage.Refresh()
+	refImagePath.Refresh()
+	dupeImage.Refresh()
+	dupeImagePath.Refresh()
 }

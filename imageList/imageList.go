@@ -119,3 +119,7 @@ func (il *ImageList) prependImage() {
 	il.imageCache = append([]image.Image{pImg}, il.imageCache[:2]...)
 	m.Unlock()
 }
+
+func (il ImageList) getIndex() int {
+	return il.index
+}
