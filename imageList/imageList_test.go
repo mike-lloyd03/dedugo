@@ -92,12 +92,13 @@ func TestNextandPrevious(t *testing.T) {
 	// Test Next
 	// ----------
 	il, _ := New(paths)
-	nextImage, err := il.Next()
+	nextImage, nextPath, err := il.Next()
 	if err != nil {
 		t.Errorf("could not get next (first) image. %s", err)
 	}
-
-	// nextImage should be the first image in the list
+	if nextPath != paths[0] {
+		t.Error("got wrong next (first) image path")
+	}
 	if !compareImages(nextImage, expectImages[0]) {
 		t.Error("got wrong next (first) image")
 	}
@@ -117,21 +118,25 @@ func TestNextandPrevious(t *testing.T) {
 		}
 	}
 	// Get second image
-	nextImage, err = il.Next()
+	nextImage, nextPath, err = il.Next()
 	if err != nil {
 		t.Errorf("could not get next (second) image. %s", err)
 	}
-	// nextImage should be the first image in the list
+	if nextPath != paths[1] {
+		t.Error("got wrong next (second) image path")
+	}
 	if !compareImages(nextImage, expectImages[1]) {
 		t.Error("got wrong next (second) image")
 	}
 
 	// Get third image
-	nextImage, err = il.Next()
+	nextImage, nextPath, err = il.Next()
 	if err != nil {
 		t.Errorf("could not get next (third) image. %s", err)
 	}
-	// nextImage should be the third image in the list
+	if nextPath != paths[2] {
+		t.Error("got wrong next (third) image path")
+	}
 	if !compareImages(nextImage, expectImages[2]) {
 		t.Error("got wrong next (third) image")
 	}
@@ -147,11 +152,13 @@ func TestNextandPrevious(t *testing.T) {
 	}
 
 	// Get fourth image
-	nextImage, err = il.Next()
+	nextImage, nextPath, err = il.Next()
 	if err != nil {
 		t.Errorf("could not get next (fourth) image. %s", err)
 	}
-	// nextImage should be the fourth image in the list
+	if nextPath != paths[3] {
+		t.Error("got wrong next (fourth) image path")
+	}
 	if !compareImages(nextImage, expectImages[3]) {
 		t.Error("got wrong next (fourth) image")
 	}
@@ -165,19 +172,24 @@ func TestNextandPrevious(t *testing.T) {
 	}
 
 	// Get fifth image
-	nextImage, err = il.Next()
+	nextImage, nextPath, err = il.Next()
 	if err != nil {
 		t.Errorf("could not get next (fifth) image. %s", err)
 	}
-	// nextImage should be the fifth image in the list
+	if nextPath != paths[4] {
+		t.Error("got wrong next (fifth) image path")
+	}
 	if !compareImages(nextImage, expectImages[4]) {
 		t.Error("got wrong next (fifth) image")
 	}
 
 	// Getting next image beyond length of list should return the last image
-	nextImage, err = il.Next()
+	nextImage, nextPath, err = il.Next()
 	if err != nil {
 		t.Errorf("could not get next (last) image after index is max. %s", err)
+	}
+	if nextPath != paths[4] {
+		t.Error("got wrong next (fifth) image path after index is max")
 	}
 	if !compareImages(nextImage, expectImages[4]) {
 		t.Error("got wrong next (last) image after index is max")
@@ -191,12 +203,14 @@ func TestNextandPrevious(t *testing.T) {
 	// Test Previous
 	// ----------
 	// Get fourth image
-	nextImage, err = il.Previous()
+	prevImage, prevPath, err := il.Previous()
 	if err != nil {
 		t.Errorf("could not get previous (fourth) image. %s", err)
 	}
-	// nextImage should be the fourth image in the list
-	if !compareImages(nextImage, expectImages[3]) {
+	if prevPath != paths[3] {
+		t.Error("got wrong next (fourth) image path")
+	}
+	if !compareImages(prevImage, expectImages[3]) {
 		t.Error("got wrong previous (fourth) image")
 	}
 
@@ -210,38 +224,46 @@ func TestNextandPrevious(t *testing.T) {
 	}
 
 	// Get third image
-	prevImage, err := il.Previous()
+	prevImage, prevPath, err = il.Previous()
 	if err != nil {
 		t.Errorf("could not get previous (third) image. %s", err)
 	}
-	// prevImage should be the fourth image in the list
+	if prevPath != paths[2] {
+		t.Error("got wrong next (third) image path")
+	}
 	if !compareImages(prevImage, expectImages[2]) {
 		t.Error("got wrong previous (third) image")
 	}
 	// Get second image
-	prevImage, err = il.Previous()
+	prevImage, prevPath, err = il.Previous()
 	if err != nil {
 		t.Errorf("could not get previous (second) image. %s", err)
 	}
-	// prevImage should be the third image in the list
+	if prevPath != paths[1] {
+		t.Error("got wrong next (second) image path")
+	}
 	if !compareImages(prevImage, expectImages[1]) {
 		t.Error("got wrong previous (second) image")
 	}
 	// Get first image
-	prevImage, err = il.Previous()
+	prevImage, prevPath, err = il.Previous()
 	if err != nil {
 		t.Errorf("could not get previous (first) image. %s", err)
 	}
-	// prevImage should be the first image in the list
+	if prevPath != paths[0] {
+		t.Error("got wrong next (first) image path")
+	}
 	if !compareImages(prevImage, expectImages[0]) {
 		t.Error("got wrong previous (first) image")
 	}
 	// Getting previous image before zero should return the first image
-	prevImage, err = il.Previous()
+	prevImage, prevPath, err = il.Previous()
 	if err != nil {
 		t.Errorf("could not get previous (first) image after index is zero. %s", err)
 	}
-	// prevImage should be the first image in the list
+	if prevPath != paths[0] {
+		t.Error("got wrong next (first) image path after index is zero")
+	}
 	if !compareImages(prevImage, expectImages[0]) {
 		t.Error("got wrong previous (first) image after index is zero")
 	}
