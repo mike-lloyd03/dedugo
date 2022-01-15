@@ -14,10 +14,11 @@ func TestNewImageList(t *testing.T) {
 		"./test_images/Obi1.jpg",
 		"./test_images/Obi2.jpg",
 		"./test_images/Jango3.jpg",
+		"./test_images/Jango4.jpg",
 	}
 
 	imgList := make([]image.Image, 3)
-	for i, path := range paths {
+	for i, path := range paths[:3] {
 		imgFile, err := os.Open(path)
 		if err != nil {
 			t.Errorf("failed to open %s %s", path, err)
@@ -55,7 +56,7 @@ func TestNewImageList(t *testing.T) {
 
 	// Compare cached images
 	for i, img := range gotIL.imageCache {
-		if !compareImages(img, gotIL.imageCache[i]) {
+		if !compareImages(img, imgList[i]) {
 			t.Error("image cache was not instantiated correctly")
 		}
 	}
@@ -71,6 +72,33 @@ func TestNewImageList(t *testing.T) {
 	if err == nil {
 		t.Error("creating an ImageList with unopenable images should return an error")
 	}
+
+	// Load image list at index > 0
+	gotIL, err = New(paths, 1)
+	if err != nil {
+		t.Log(err)
+		t.Error("failed to create image list at index > 0")
+	}
+
+	// Compare index
+	if gotIL.index != 1 {
+		t.Error("index field for new image list index > 0 was not instantiated correctly")
+	}
+
+	// Compare paths
+	for i, p := range gotIL.paths {
+		if p != expectIL.paths[i] {
+			t.Error("path field was not instantiated correctly")
+		}
+	}
+
+	// Compare cached images
+	for i, img := range gotIL.imageCache {
+		if !compareImages(img, imgList[i+1]) {
+			t.Error("image cache was not instantiated correctly")
+		}
+	}
+
 }
 
 func TestNextandPrevious(t *testing.T) {

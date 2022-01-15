@@ -22,25 +22,29 @@ type ImageList struct {
 }
 
 // New creates a new ImageList type and initializes the image cache.
-func New(paths []string) (ImageList, error) {
+func New(paths []string, index ...int) (ImageList, error) {
+	var i int
+	if len(index) == 0 {
+		i = 0
+	} else {
+		i = index[0]
+	}
+
 	if len(paths) < 3 {
 		return ImageList{}, errors.New("paths argument must contain at least 2 items")
 	}
 
-	imgCache := make([]image.Image, 3)
-	for i := 0; i < 3; i++ {
-		img, err := loadImage(paths[i])
-		if err != nil {
-			return ImageList{}, errors.New(fmt.Sprint("could not load image", paths[i]))
-		}
-		imgCache[i] = img
+	il := ImageList{
+		index: i,
+		paths: paths,
 	}
 
-	return ImageList{
-		index:      0,
-		paths:      paths,
-		imageCache: imgCache,
-	}, nil
+	err := il.initCache(i)
+	if err != nil {
+		return ImageList{}, errors.New(fmt.Sprintf("failed to initialize image cache. %s", err))
+	}
+
+	return il, nil
 }
 
 // Next returns the next image in the cache and it's path.
@@ -91,19 +95,6 @@ func (il *ImageList) Previous() (image.Image, string, error) {
 	return nil, "", errors.New(fmt.Sprint("image list index out of range: ", il.index))
 }
 
-func loadImage(path string) (image.Image, error) {
-	imgBytes, err := ioutil.ReadFile(path)
-	if err != nil {
-		return nil, errors.New("image could not be opened")
-	}
-	imgReader := bytes.NewReader(imgBytes)
-	img, _, err := image.Decode(imgReader)
-	if err != nil {
-		return nil, errors.New("image could not be decoded")
-	}
-	return img, nil
-}
-
 func (il *ImageList) appendImage() {
 	defer w.Done()
 	aImg, _ := loadImage(il.paths[il.index])
@@ -120,6 +111,31 @@ func (il *ImageList) prependImage() {
 	m.Unlock()
 }
 
-func (il ImageList) getIndex() int {
-	return il.index
+func (il *ImageList) initCache(index int) error {
+	imgCache := make([]image.Image, 3)
+	for i := index; i < index+3; i++ {
+		img, err := loadImage(il.paths[i])
+		if err != nil {
+			return errors.New(fmt.Sprintf("could not load image. %s", err))
+		}
+		imgCache[i] = img
+	}
+	il.imageCache = imgCache
+	return nil
+}
+
+func (il *ImageList) goToIndex(index int) {
+}
+
+func loadImage(path string) (image.Image, error) {
+	imgBytes, err := ioutil.ReadFile(path)
+	if err != nil {
+		return nil, errors.New("image could not be opened")
+	}
+	imgReader := bytes.NewReader(imgBytes)
+	img, _, err := image.Decode(imgReader)
+	if err != nil {
+		return nil, errors.New("image could not be decoded")
+	}
+	return img, nil
 }
