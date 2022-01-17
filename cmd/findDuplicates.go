@@ -16,7 +16,6 @@ limitations under the License.
 package cmd
 
 import (
-	"bytes"
 	"fmt"
 	"image"
 	"io/fs"
@@ -25,6 +24,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"time"
 
 	_ "github.com/adrium/goheif"
 	"github.com/spf13/cobra"
@@ -60,8 +60,9 @@ var (
 		".heic": {},
 		".png":  {},
 	}
-	wg sync.WaitGroup
-	m  sync.Mutex
+	wg        sync.WaitGroup
+	m         sync.Mutex
+	openFiles int = 0
 )
 
 type Image struct {
@@ -84,6 +85,14 @@ type Results struct {
 }
 
 func findDuplicates(refDir, evalDir string) {
+	// Setup logging
+	file, err := os.OpenFile("dedugo.log", os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
+	defer file.Close()
+	if err != nil {
+		log.Fatal(err)
+	}
+	log.SetOutput(file)
+
 	pairMap := make(map[string]Pair)
 
 	refImages, err := getImagesFromDir(refDir)
@@ -131,9 +140,8 @@ func isImage(path string) bool {
 	return found
 }
 
-func getImagesFromDir(dir string) ([]Image, error) {
-	imageList := make([]Image, 0)
-	ch := make(chan Image, countFiles(dir))
+func getImagesFromDir(dir string) (map[string]Image, error) {
+	imageList := make(map[string]Image, 0)
 	fmt.Println("Walking directory", dir)
 	fmt.Println()
 
@@ -143,46 +151,58 @@ func getImagesFromDir(dir string) ([]Image, error) {
 		if !entry.IsDir() {
 			if isImage(path) {
 				wg.Add(1)
-				go openAndHash(path, imageList, ch)
+				go openAndHash(path, imageList)
 			}
+		}
+		if err != nil {
+			log.Fatal(path, err)
 		}
 		return nil
 	},
 	)
 	wg.Wait()
-	close(ch)
-	for img := range ch {
-		imageList = append(imageList, img)
-	}
 	return imageList, nil
 }
 
-func openAndHash(path string, imageList []Image, ch chan Image) {
+func openAndHash(path string, imageList map[string]Image) {
 	defer wg.Done()
 	img, err := OpenImage(path)
 	if err != nil {
-		log.Printf("Error opening %s: %s", path, err)
-		return
+		// openAndHash(path, imageList)
+		log.Fatalf("Error opening %s: %s", path, err)
 	}
 	hash, size := images.Hash(img)
-	ch <- Image{path, hash, size}
+	m.Lock()
+	imageList[path] = Image{path, hash, size}
+	m.Unlock()
 }
 
 // OpenImage opens and decodes an image file for a given path.
 func OpenImage(path string) (img image.Image, err error) {
-	fileBytes, err := os.ReadFile(path)
-	if err != nil {
+	if openFiles > 500 {
+		time.Sleep(10 * time.Millisecond)
 		return OpenImage(path)
 	}
-	file := bytes.NewReader(fileBytes)
+	file, err := os.Open(path)
+	if err != nil {
+		log.Fatal(err)
+	} else {
+		m.Lock()
+		openFiles++
+		m.Unlock()
+	}
 	img, _, err = image.Decode(file)
+	file.Close()
+	m.Lock()
+	openFiles--
+	m.Unlock()
 	if err != nil {
 		return nil, err
 	}
-	return img, err
+	return img, nil
 }
 
-func CompareImages(refImg Image, evalImages []Image, pairMap map[string]Pair) {
+func CompareImages(refImg Image, evalImages map[string]Image, pairMap map[string]Pair) {
 	defer wg.Done()
 	for _, evalImg := range evalImages {
 		if images.Similar(refImg.Hash, evalImg.Hash, refImg.Size, evalImg.Size) {
