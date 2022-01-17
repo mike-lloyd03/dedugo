@@ -33,6 +33,9 @@ func New(paths []string, index ...int) (ImageList, error) {
 	if len(paths) < 3 {
 		return ImageList{}, errors.New("paths argument must contain at least 2 items")
 	}
+	if i > len(paths) {
+		return ImageList{}, errors.New("index is greater than length of path list")
+	}
 
 	il := ImageList{
 		index: i,
@@ -112,13 +115,28 @@ func (il *ImageList) prependImage() {
 }
 
 func (il *ImageList) initCache(index int) error {
+	var startIndex, endIndex int
 	imgCache := make([]image.Image, 3)
-	for i := index; i < index+3; i++ {
+
+	if index <= 1 {
+		startIndex = 0
+		endIndex = 2
+	} else if index >= len(il.paths)-3 {
+		startIndex = len(il.paths) - 3
+		endIndex = len(il.paths) - 1
+	} else {
+		startIndex = index - 1
+		endIndex = index + 1
+	}
+
+	imgCacheIdx := 0
+	for i := startIndex; i <= endIndex; i++ {
 		img, err := loadImage(il.paths[i])
 		if err != nil {
 			return errors.New(fmt.Sprintf("could not load image. %s", err))
 		}
-		imgCache[i] = img
+		imgCache[imgCacheIdx] = img
+		imgCacheIdx++
 	}
 	il.imageCache = imgCache
 	return nil
@@ -130,12 +148,12 @@ func (il *ImageList) goToIndex(index int) {
 func loadImage(path string) (image.Image, error) {
 	imgBytes, err := ioutil.ReadFile(path)
 	if err != nil {
-		return nil, errors.New("image could not be opened")
+		return nil, err
 	}
 	imgReader := bytes.NewReader(imgBytes)
 	img, _, err := image.Decode(imgReader)
 	if err != nil {
-		return nil, errors.New("image could not be decoded")
+		return nil, err
 	}
 	return img, nil
 }
