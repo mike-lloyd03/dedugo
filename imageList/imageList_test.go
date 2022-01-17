@@ -114,6 +114,20 @@ func TestNewImageList(t *testing.T) {
 			t.Error("image cache at index = 2 was not instantiated correctly")
 		}
 	}
+
+	// Load image list at index = len(paths)-1
+	gotIL, err = New(paths, len(paths)-1)
+	if err != nil {
+		t.Log(err)
+		t.Error("failed to create image list at index = ", len(paths)-1)
+	}
+
+	// Compare cached images
+	for i, img := range gotIL.imageCache {
+		if !compareImages(img, imgList[i+len(paths)-3]) {
+			t.Error("image cache at index = len(paths)-1 was not instantiated correctly")
+		}
+	}
 }
 
 func TestNextandPrevious(t *testing.T) {
