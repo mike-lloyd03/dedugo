@@ -21,11 +21,11 @@ import (
 	"io/fs"
 	"log"
 	"os"
-	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"sync"
-	"syscall"
+	"time"
 
 	_ "github.com/adrium/goheif"
 	"github.com/spf13/cobra"
@@ -34,7 +34,6 @@ import (
 
 var (
 	results_path string
-	fileLimit    int
 )
 
 // findDuplicatesCmd represents the findDuplicates command
@@ -53,7 +52,6 @@ func init() {
 	rootCmd.AddCommand(findDuplicatesCmd)
 
 	findDuplicatesCmd.Flags().StringVarP(&results_path, "output", "o", "dedugo_results.yaml", "output file for results")
-	findDuplicatesCmd.Flags().IntVarP(&fileLimit, "limit", "l", 1024, "set the prlimit for number of open files for the process")
 }
 
 var (
@@ -88,6 +86,8 @@ type Results struct {
 }
 
 func findDuplicates(refDir, evalDir string) {
+	startTime := time.Now()
+
 	// Setup logging
 	file, err := os.OpenFile("dedugo.log", os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
 	defer file.Close()
@@ -96,14 +96,9 @@ func findDuplicates(refDir, evalDir string) {
 	}
 	log.SetOutput(file)
 
-	err = exec.Command("prlimit", fmt.Sprintf("--nofile=%d", fileLimit), "--pid", fmt.Sprint(os.Getpid())).Run()
-	if err != nil {
-		log.Fatal(err)
-	}
+	log.Printf("Finding duplicates for %s and %s\n", refDir, evalDir)
 
-	rlimit := syscall.Rlimit{}
-	syscall.Getrlimit(syscall.RLIMIT_NOFILE, &rlimit)
-	maxWorkers = int(rlimit.Cur * 8 / 10)
+	maxWorkers = runtime.NumCPU()
 
 	pairMap := make(map[string]Pair)
 
@@ -130,6 +125,7 @@ func findDuplicates(refDir, evalDir string) {
 	fmt.Printf("Done. %d potential duplicate images found.\n", len(pairMap))
 	// checkDuplicates(pairMap)
 	GenerateResults(refDir, evalDir, pairMap)
+	log.Printf("Done. Total elapsed time: %s", time.Now().Sub(startTime).Round(10*time.Millisecond))
 }
 
 func getImagePaths(dir string) []string {
@@ -166,7 +162,8 @@ func getImagesFromDir(dir string) ([]Image, error) {
 	} else {
 		numWorkers = maxWorkers
 	}
-	log.Println("Number of workers:", numWorkers)
+	startTime := time.Now()
+	log.Printf("Beginning scan of %s with %d workers.\n", dir, numWorkers)
 
 	for i := 0; i < numWorkers; i++ {
 		wg.Add(1)
@@ -183,6 +180,7 @@ func getImagesFromDir(dir string) ([]Image, error) {
 	for img := range imageChan {
 		imageList = append(imageList, img)
 	}
+	log.Printf("Finished scan. Found %d images. Elapsed time: %s\n", len(imageList), time.Now().Sub(startTime).Round(10*time.Millisecond))
 	return imageList, nil
 }
 
