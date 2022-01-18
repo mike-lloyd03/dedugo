@@ -1,5 +1,4 @@
 # Dedugo
-__Duplicate Image Finder__
 
 ### Summary
 
@@ -39,6 +38,7 @@ dedugo delete-duplicates
 - [ ] I probably need to incorporate the idea of similar image clusters rather than just image pairs.
 - [ ] Write tests...
 - [ ] GUI should show if an image has already been confirmed and allow user to unmark it.
+- [ ] Prevent system sleep while running `find-duplicates`.
 
 ### Thanks
 A special thanks to [Vitali Fedulov](https://github.com/vitali-fedulov) for writing the [Go package](https://github.com/vitali-fedulov/images) upon which this tool is built.
