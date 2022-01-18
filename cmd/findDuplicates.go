@@ -18,6 +18,7 @@ package cmd
 import (
 	"fmt"
 	"image"
+	"io"
 	"io/fs"
 	"log"
 	"os"
@@ -34,6 +35,7 @@ import (
 
 var (
 	results_path string
+	logToFile    bool
 )
 
 // findDuplicatesCmd represents the findDuplicates command
@@ -52,6 +54,7 @@ func init() {
 	rootCmd.AddCommand(findDuplicatesCmd)
 
 	findDuplicatesCmd.Flags().StringVarP(&results_path, "output", "o", "dedugo_results.yaml", "output file for results")
+	findDuplicatesCmd.Flags().BoolVar(&logToFile, "log", false, "log events to file")
 }
 
 var (
@@ -89,12 +92,16 @@ func findDuplicates(refDir, evalDir string) {
 	startTime := time.Now()
 
 	// Setup logging
-	file, err := os.OpenFile("dedugo.log", os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
-	defer file.Close()
-	if err != nil {
-		log.Fatal(err)
+	if logToFile {
+		file, err := os.OpenFile("dedugo.log", os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
+		defer file.Close()
+		if err != nil {
+			log.Fatal(err)
+		}
+		log.SetOutput(file)
+	} else {
+		log.SetOutput(io.Discard)
 	}
-	log.SetOutput(file)
 
 	log.Printf("Finding duplicates for %s and %s\n", refDir, evalDir)
 
