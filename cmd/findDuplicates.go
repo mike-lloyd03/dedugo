@@ -21,10 +21,11 @@ import (
 	"io/fs"
 	"log"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"sync"
-	"time"
+	"syscall"
 
 	_ "github.com/adrium/goheif"
 	"github.com/spf13/cobra"
@@ -33,6 +34,7 @@ import (
 
 var (
 	results_path string
+	fileLimit    int
 )
 
 // findDuplicatesCmd represents the findDuplicates command
@@ -51,6 +53,7 @@ func init() {
 	rootCmd.AddCommand(findDuplicatesCmd)
 
 	findDuplicatesCmd.Flags().StringVarP(&results_path, "output", "o", "dedugo_results.yaml", "output file for results")
+	findDuplicatesCmd.Flags().IntVarP(&fileLimit, "limit", "l", 1024, "set the prlimit for number of open files for the process")
 }
 
 var (
@@ -60,9 +63,9 @@ var (
 		".heic": {},
 		".png":  {},
 	}
-	wg        sync.WaitGroup
-	m         sync.Mutex
-	openFiles int = 0
+	wg         sync.WaitGroup
+	m          sync.Mutex
+	maxWorkers int
 )
 
 type Image struct {
@@ -93,14 +96,25 @@ func findDuplicates(refDir, evalDir string) {
 	}
 	log.SetOutput(file)
 
+	err = exec.Command("prlimit", fmt.Sprintf("--nofile=%d", fileLimit), "--pid", fmt.Sprint(os.Getpid())).Run()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	rlimit := syscall.Rlimit{}
+	syscall.Getrlimit(syscall.RLIMIT_NOFILE, &rlimit)
+	maxWorkers = int(rlimit.Cur * 8 / 10)
+
 	pairMap := make(map[string]Pair)
 
+	fmt.Println("Walking reference directory", refDir)
 	refImages, err := getImagesFromDir(refDir)
 	if err != nil {
 		log.Fatal("Error:", err)
 	}
 	fmt.Printf("Images found in reference directory: %d images.\n", len(refImages))
 
+	fmt.Println("Walking evaluation directory", evalDir)
 	evalImages, err := getImagesFromDir(evalDir)
 	if err != nil {
 		log.Fatal("Error:", err)
@@ -118,40 +132,12 @@ func findDuplicates(refDir, evalDir string) {
 	GenerateResults(refDir, evalDir, pairMap)
 }
 
-func countFiles(dir string) int {
-	count := 0
-	files, err := os.ReadDir(dir)
-	if err != nil {
-		log.Fatal(err)
-	}
-	for _, file := range files {
-		path := filepath.Join(dir, file.Name())
-		if file.IsDir() {
-			count += countFiles(path)
-		} else if isImage(path) {
-			count++
-		}
-	}
-	return count
-}
-
-func isImage(path string) bool {
-	_, found := imgFormats[strings.ToLower(filepath.Ext(path))]
-	return found
-}
-
-func getImagesFromDir(dir string) (map[string]Image, error) {
-	imageList := make(map[string]Image, 0)
-	fmt.Println("Walking directory", dir)
-	fmt.Println()
-
+func getImagePaths(dir string) []string {
+	paths := make([]string, 0)
 	filepath.WalkDir(dir, func(path string, entry fs.DirEntry, err error) error {
-		fmt.Print("\033[1A\033[K")
-		fmt.Println("Reading:", path)
 		if !entry.IsDir() {
 			if isImage(path) {
-				wg.Add(1)
-				go openAndHash(path, imageList)
+				paths = append(paths, path)
 			}
 		}
 		if err != nil {
@@ -160,49 +146,73 @@ func getImagesFromDir(dir string) (map[string]Image, error) {
 		return nil
 	},
 	)
+	return paths
+}
+
+func isImage(path string) bool {
+	_, found := imgFormats[strings.ToLower(filepath.Ext(path))]
+	return found
+}
+
+func getImagesFromDir(dir string) ([]Image, error) {
+	imgs := getImagePaths(dir)
+	imageList := make([]Image, 0)
+	pathChan := make(chan string, len(imgs))
+	imageChan := make(chan Image, len(imgs))
+
+	var numWorkers int
+	if len(imgs) < maxWorkers {
+		numWorkers = len(imgs)
+	} else {
+		numWorkers = maxWorkers
+	}
+	log.Println("Number of workers:", numWorkers)
+
+	for i := 0; i < numWorkers; i++ {
+		wg.Add(1)
+		go openAndHashWorker(pathChan, imageChan)
+	}
+
+	for _, path := range imgs {
+		pathChan <- path
+	}
+
+	close(pathChan)
 	wg.Wait()
+	close(imageChan)
+	for img := range imageChan {
+		imageList = append(imageList, img)
+	}
 	return imageList, nil
 }
 
-func openAndHash(path string, imageList map[string]Image) {
+func openAndHashWorker(pathChan <-chan string, imageChan chan<- Image) {
 	defer wg.Done()
-	img, err := OpenImage(path)
-	if err != nil {
-		// openAndHash(path, imageList)
-		log.Fatalf("Error opening %s: %s", path, err)
+	for path := range pathChan {
+		img, err := OpenImage(path)
+		if err != nil {
+			log.Fatalf("Error opening %s: %s", path, err)
+		}
+		hash, size := images.Hash(img)
+		imageChan <- Image{path, hash, size}
 	}
-	hash, size := images.Hash(img)
-	m.Lock()
-	imageList[path] = Image{path, hash, size}
-	m.Unlock()
 }
 
 // OpenImage opens and decodes an image file for a given path.
 func OpenImage(path string) (img image.Image, err error) {
-	if openFiles > 500 {
-		time.Sleep(10 * time.Millisecond)
-		return OpenImage(path)
-	}
 	file, err := os.Open(path)
 	if err != nil {
 		log.Fatal(err)
-	} else {
-		m.Lock()
-		openFiles++
-		m.Unlock()
 	}
 	img, _, err = image.Decode(file)
 	file.Close()
-	m.Lock()
-	openFiles--
-	m.Unlock()
 	if err != nil {
 		return nil, err
 	}
 	return img, nil
 }
 
-func CompareImages(refImg Image, evalImages map[string]Image, pairMap map[string]Pair) {
+func CompareImages(refImg Image, evalImages []Image, pairMap map[string]Pair) {
 	defer wg.Done()
 	for _, evalImg := range evalImages {
 		if images.Similar(refImg.Hash, evalImg.Hash, refImg.Size, evalImg.Size) {
