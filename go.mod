@@ -35,6 +35,8 @@ require (
 	github.com/srwiley/rasterx v0.0.0-20200120212402-85cb7272f5e9 // indirect
 	github.com/stretchr/testify v1.7.0 // indirect
 	github.com/subosito/gotenv v1.2.0 // indirect
+	github.com/vitali-fedulov/hyper v1.0.1 // indirect
+	github.com/vitali-fedulov/images3 v1.0.11 // indirect
 	github.com/yuin/goldmark v1.3.8 // indirect
 	golang.org/x/image v0.0.0-20200430140353-33d19683fad8 // indirect
 	golang.org/x/net v0.0.0-20210813160813-60bc85c4be6d // indirect

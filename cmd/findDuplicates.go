@@ -30,7 +30,7 @@ import (
 
 	_ "github.com/adrium/goheif"
 	"github.com/spf13/cobra"
-	"github.com/vitali-fedulov/images"
+	images "github.com/vitali-fedulov/images3"
 )
 
 var (
@@ -71,8 +71,7 @@ var (
 
 type Image struct {
 	Path string
-	Hash []float32
-	Size image.Point
+	Icon images.IconT
 }
 
 type Pair struct {
@@ -198,8 +197,8 @@ func openAndHashWorker(pathChan <-chan string, imageChan chan<- Image) {
 		if err != nil {
 			log.Fatalf("Error opening %s: %s", path, err)
 		}
-		hash, size := images.Hash(img)
-		imageChan <- Image{path, hash, size}
+		icon := images.Icon(img, path)
+		imageChan <- Image{path, icon}
 	}
 }
 
@@ -220,7 +219,7 @@ func OpenImage(path string) (img image.Image, err error) {
 func CompareImages(refImg Image, evalImages []Image, pairMap map[string]Pair) {
 	defer wg.Done()
 	for _, evalImg := range evalImages {
-		if images.Similar(refImg.Hash, evalImg.Hash, refImg.Size, evalImg.Size) {
+		if images.Similar(refImg.Icon, evalImg.Icon) {
 			m.Lock()
 			pairMap[refImg.Path+","+evalImg.Path] = Pair{RefImage: refImg.Path, DupeImage: evalImg.Path}
 			m.Unlock()
