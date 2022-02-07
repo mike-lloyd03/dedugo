@@ -34,8 +34,9 @@ import (
 )
 
 var (
-	results_path string
-	logToFile    bool
+	results_path  string
+	logToFile     bool
+	minConfidence int
 )
 
 // findDuplicatesCmd represents the findDuplicates command
@@ -55,6 +56,7 @@ func init() {
 
 	findDuplicatesCmd.Flags().StringVarP(&results_path, "output", "o", "dedugo_results.yaml", "output file for results")
 	findDuplicatesCmd.Flags().BoolVar(&logToFile, "log", false, "log events to file")
+	findDuplicatesCmd.Flags().IntVarP(&minConfidence, "min-confidence", "m", 1, "set the minimum confidence score (1-5) required to consider images similar")
 }
 
 var (
@@ -75,9 +77,10 @@ type Image struct {
 }
 
 type Pair struct {
-	RefImage  string `yaml:"ReferenceImage"`
-	DupeImage string `yaml:"DuplicateImage"`
-	Confirmed bool   `yaml:"Confirmed?"`
+	RefImage   string `yaml:"ReferenceImage"`
+	DupeImage  string `yaml:"DuplicateImage"`
+	Confirmed  bool   `yaml:"Confirmed?"`
+	Confidence int    `yaml:"Confidence"`
 }
 
 type Results struct {
@@ -102,7 +105,7 @@ func findDuplicates(refDir, evalDir string) {
 		log.SetOutput(io.Discard)
 	}
 
-	log.Printf("Finding duplicates for %s and %s\n", refDir, evalDir)
+	log.Printf("Finding duplicates for %s and %s. Minimum confidence score = %d.\n", refDir, evalDir, minConfidence)
 
 	maxWorkers = runtime.NumCPU()
 
@@ -131,7 +134,7 @@ func findDuplicates(refDir, evalDir string) {
 	fmt.Printf("Done. %d potential duplicate images found.\n", len(pairMap))
 	// checkDuplicates(pairMap)
 	GenerateResults(refDir, evalDir, pairMap)
-	log.Printf("Done. Total elapsed time: %s", time.Now().Sub(startTime).Round(10*time.Millisecond))
+	log.Printf("Done. Found %d potential duplicates. Total elapsed time: %s", len(pairMap), time.Now().Sub(startTime).Round(10*time.Millisecond))
 }
 
 func getImagePaths(dir string) []string {
@@ -161,6 +164,7 @@ func getImagesFromDir(dir string) ([]Image, error) {
 	imageList := make([]Image, 0)
 	pathChan := make(chan string, len(imgs))
 	imageChan := make(chan Image, len(imgs))
+	countChan := make(chan bool, len(imgs))
 
 	var numWorkers int
 	if len(imgs) < maxWorkers {
@@ -171,9 +175,11 @@ func getImagesFromDir(dir string) ([]Image, error) {
 	startTime := time.Now()
 	log.Printf("Beginning scan of %s with %d workers.\n", dir, numWorkers)
 
+	go monitorProgress(countChan, len(imgs))
+
 	for i := 0; i < numWorkers; i++ {
 		wg.Add(1)
-		go openAndHashWorker(pathChan, imageChan)
+		go openAndHashWorker(pathChan, imageChan, countChan)
 	}
 
 	for _, path := range imgs {
@@ -183,6 +189,7 @@ func getImagesFromDir(dir string) ([]Image, error) {
 	close(pathChan)
 	wg.Wait()
 	close(imageChan)
+	close(countChan)
 	for img := range imageChan {
 		imageList = append(imageList, img)
 	}
@@ -190,7 +197,7 @@ func getImagesFromDir(dir string) ([]Image, error) {
 	return imageList, nil
 }
 
-func openAndHashWorker(pathChan <-chan string, imageChan chan<- Image) {
+func openAndHashWorker(pathChan <-chan string, imageChan chan<- Image, countChan chan<- bool) {
 	defer wg.Done()
 	for path := range pathChan {
 		img, err := OpenImage(path)
@@ -199,6 +206,7 @@ func openAndHashWorker(pathChan <-chan string, imageChan chan<- Image) {
 		}
 		icon := images.Icon(img, path)
 		imageChan <- Image{path, icon}
+		countChan <- true
 	}
 }
 
@@ -219,9 +227,16 @@ func OpenImage(path string) (img image.Image, err error) {
 func CompareImages(refImg Image, evalImages []Image, pairMap map[string]Pair) {
 	defer wg.Done()
 	for _, evalImg := range evalImages {
-		if images.Similar(refImg.Icon, evalImg.Icon) {
+		// m1, m2, m3 := images.EucMetric(refImg.Icon, evalImg.Icon)
+		// if (m1+m2+m3)/3 < 2000 {
+		// 	m.Lock()
+		// 	pairMap[refImg.Path+","+evalImg.Path] = Pair{RefImage: refImg.Path, DupeImage: evalImg.Path}
+		// 	m.Unlock()
+		// }
+		confidence := calcConfidence(images.EucMetric(refImg.Icon, evalImg.Icon))
+		if confidence >= minConfidence {
 			m.Lock()
-			pairMap[refImg.Path+","+evalImg.Path] = Pair{RefImage: refImg.Path, DupeImage: evalImg.Path}
+			pairMap[refImg.Path+","+evalImg.Path] = Pair{RefImage: refImg.Path, DupeImage: evalImg.Path, Confidence: confidence}
 			m.Unlock()
 		}
 	}
@@ -241,4 +256,38 @@ func GenerateResults(refDir, evalDir string, pairMap map[string]Pair) {
 		ImagePairs: pairArray,
 	}
 	WriteResultsFile(results, results_path)
+}
+
+// calcConfidence returns the confidence that two images are similar on a scale of 0-5
+// with 5 being the highest confidence
+func calcConfidence(m1, m2, m3 float32) int {
+	avg := (m1 + m2 + m3) / 3
+	if avg < 2000 {
+		return 5
+	}
+	if avg < 5000 {
+		return 4
+	}
+	if avg < 8000 {
+		return 3
+	}
+	if avg < 11000 {
+		return 2
+	}
+	if avg < 14000 {
+		return 1
+	}
+	return 0
+}
+
+func monitorProgress(countChan chan bool, total int) {
+	count := 1
+	fmt.Println()
+	for done := range countChan {
+		if done {
+			fmt.Print("\033[1A\033[K")
+			fmt.Printf("Scanning in progress: %d / %d\n", count, total)
+			count += 1
+		}
+	}
 }
