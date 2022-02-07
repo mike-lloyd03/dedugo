@@ -89,8 +89,8 @@ func showGui() {
 
 func confirmDuplicate() func() {
 	return func() {
-		p := results.ImagePairs[results.StartIdx]
-		p.Confirmed = true
+		results.ImagePairs[results.StartIdx].Confirmed = true
+		go WriteResultsFile(results, results_path)
 		nextPair()
 	}
 }
