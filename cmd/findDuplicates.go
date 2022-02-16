@@ -18,7 +18,6 @@ package cmd
 import (
 	"fmt"
 	"image"
-	"io"
 	"io/fs"
 	"log"
 	"os"
@@ -34,7 +33,7 @@ import (
 )
 
 var (
-	results_path  string
+	resultsPath   string
 	logToFile     bool
 	minConfidence int
 )
@@ -54,9 +53,13 @@ var findDuplicatesCmd = &cobra.Command{
 func init() {
 	rootCmd.AddCommand(findDuplicatesCmd)
 
-	findDuplicatesCmd.Flags().StringVarP(&results_path, "output", "o", "dedugo_results.yaml", "output file for results")
+	findDuplicatesCmd.Flags().StringVarP(&resultsPath, "output-file", "o", "dedugo_results.yaml", "output file for results")
 	findDuplicatesCmd.Flags().BoolVar(&logToFile, "log", false, "log events to file")
 	findDuplicatesCmd.Flags().IntVarP(&minConfidence, "min-confidence", "m", 1, "set the minimum confidence score (1-5) required to consider images similar")
+
+	if minConfidence < 1 || minConfidence > 5 {
+		log.Fatal("Minimum confidence must be in the range of 1-5")
+	}
 }
 
 var (
@@ -93,17 +96,7 @@ type Results struct {
 func findDuplicates(refDir, evalDir string) {
 	startTime := time.Now()
 
-	// Setup logging
-	if logToFile {
-		file, err := os.OpenFile("dedugo.log", os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
-		defer file.Close()
-		if err != nil {
-			log.Fatal(err)
-		}
-		log.SetOutput(file)
-	} else {
-		log.SetOutput(io.Discard)
-	}
+	setupLogging(logToFile)
 
 	log.Printf("Finding duplicates for %s and %s. Minimum confidence score = %d.\n", refDir, evalDir, minConfidence)
 
@@ -255,7 +248,7 @@ func GenerateResults(refDir, evalDir string, pairMap map[string]Pair) {
 		StartIdx:   0,
 		ImagePairs: pairArray,
 	}
-	WriteResultsFile(results, results_path)
+	WriteResultsFile(results, resultsPath)
 }
 
 // calcConfidence returns the confidence that two images are similar on a scale of 0-5

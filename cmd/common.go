@@ -1,8 +1,10 @@
 package cmd
 
 import (
+	"io"
 	"io/ioutil"
 	"log"
+	"os"
 
 	"gopkg.in/yaml.v2"
 )
@@ -26,5 +28,18 @@ func WriteResultsFile(results Results, path string) {
 	err = ioutil.WriteFile(path, data, 0644)
 	if err != nil {
 		log.Fatal("Error writing results file.", err)
+	}
+}
+
+func setupLogging(logToFile bool) {
+	if logToFile {
+		file, err := os.OpenFile("dedugo.log", os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
+		// defer file.Close()
+		if err != nil {
+			log.Fatal(err)
+		}
+		log.SetOutput(file)
+	} else {
+		log.SetOutput(io.Discard)
 	}
 }

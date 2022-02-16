@@ -17,9 +17,16 @@ package cmd
 
 import (
 	"fmt"
+	"log"
 	"os"
+	"strings"
 
 	"github.com/spf13/cobra"
+)
+
+var (
+	deleteAll bool
+	dryRun    bool
 )
 
 // deleteDuplicatesCmd represents the deleteDuplicates command
@@ -35,14 +42,35 @@ var deleteDuplicatesCmd = &cobra.Command{
 
 func init() {
 	rootCmd.AddCommand(deleteDuplicatesCmd)
+
+	deleteDuplicatesCmd.Flags().StringVarP(&resultsPath, "input-file", "i", "dedugo_results.yaml", "input file to read results from")
+	deleteDuplicatesCmd.Flags().BoolVar(&deleteAll, "all", false, "delete all duplicate images whether they are confirmed or not")
+	deleteDuplicatesCmd.Flags().BoolVar(&logToFile, "log", false, "log events to file")
+	deleteDuplicatesCmd.Flags().BoolVar(&dryRun, "dry-run", false, "show only what would be deleted without actually doing it")
 }
 
 func deleteDuplicates() {
-	results := readResultsFile(results_path)
+	setupLogging(logToFile)
+
+	var input string
+	fmt.Printf("Are you sure you want to delete all duplicate images found in %s? [y/N]: ", resultsPath)
+	fmt.Scan(&input)
+	if strings.ToLower(input) != "yes" && strings.ToLower(input) != "y" {
+		fmt.Println("Aborting")
+		return
+	}
+
+	results := readResultsFile(resultsPath)
+	log.Printf("Deleting duplicate images.")
 	for _, p := range results.ImagePairs {
-		if p.Confirmed {
+		if p.Confirmed || deleteAll {
 			fmt.Println("Deleting", p.DupeImage)
-			os.Remove(p.DupeImage)
+			if !dryRun {
+				err := os.Remove(p.DupeImage)
+				if err != nil {
+					log.Printf("Failed to delete %s. %s\n", p.DupeImage, err)
+				}
+			}
 		}
 	}
 	fmt.Println("Done.")
